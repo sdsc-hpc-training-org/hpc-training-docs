@@ -196,6 +196,35 @@ function addFrontmatterTitle(text) {
   return `---\n${newFm}---\n${body}`;
 }
 
+function toTitleFromFolder(folderName) {
+  return folderName
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function addReadmeFolderTitle(text, sourcePath = "") {
+  const base = path.basename(sourcePath || "").toLowerCase();
+  if (base !== "readme.md" && base !== "readme.mdx") return text;
+
+  const folder = path.basename(path.dirname(sourcePath || ""));
+  const folderTitle = toTitleFromFolder(folder || "README");
+  if (!folderTitle) return text;
+
+  // If file already has frontmatter, add title only when missing.
+  const fmMatch = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  if (fmMatch) {
+    const fm = fmMatch[1];
+    const body = fmMatch[2];
+    if (/^title\s*:/m.test(fm)) return text;
+    return `---\n${fm.trimEnd()}\ntitle: ${JSON.stringify(folderTitle)}\n---\n${body}`;
+  }
+
+  // No frontmatter: prepend one with folder-based title.
+  return `---\ntitle: ${JSON.stringify(folderTitle)}\n---\n${text}`;
+}
+
 const HTML_TAGS = new Set([
   "a",
   "b",
@@ -330,6 +359,9 @@ function fixFileSpecificLinks(text, sourcePath) {
 
 function patchMdx(text, sourcePath = "") {
   const fileDir = sourcePath ? path.dirname(sourcePath) : process.cwd();
+
+  // For README files, prefer folder name as page title.
+  text = addReadmeFolderTitle(text, sourcePath);
 
   // add title first (uses original H1 before any later normalization)
   text = addFrontmatterTitle(text);
