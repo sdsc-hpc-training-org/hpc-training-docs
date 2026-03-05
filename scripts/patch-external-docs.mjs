@@ -123,22 +123,77 @@ function hasResolvableLocalImage(src, fileDir) {
   return fs.existsSync(path.resolve(fileDir, src));
 }
 
-function patchMdx(text, fileDir = process.cwd()) {
+function fixFileSpecificLinks(text, sourcePath) {
+  const src = (sourcePath || "").replace(/\\/g, "/");
+
+  function rewriteToSiblingDocs(input, slugs) {
+    let out = input;
+    for (const slug of slugs) {
+      const escaped = slug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      out = out.replace(new RegExp(`\\]\\(#${escaped}\\)`, "gi"), `](./${slug})`);
+      out = out.replace(new RegExp(`\\]\\(${escaped}\\)`, "gi"), `](./${slug})`);
+    }
+    return out;
+  }
+
+  if (src.endsWith("/basic_skills/basic_linux_skills_expanse/basic_linux_skills_expanse.md")) {
+    text = rewriteToSiblingDocs(text, [
+      "basic-environment",
+      "directories-navigation",
+      "copying-directories",
+      "manipulating-files",
+      "permissions",
+      "wildcards-utilities",
+    ]);
+  }
+
+  if (src.endsWith("/basic_skills/interactive_computing/interactive_computing.md")) {
+    text = rewriteToSiblingDocs(text, [
+      "interactive-nodes",
+      "interactive-node-command-line",
+      "interactive-gpu-command-line",
+    ]);
+  }
+
+  if (src.endsWith("/basic_skills/using_github/using_github.md")) {
+    text = rewriteToSiblingDocs(text, [
+      "create-github-account",
+      "install-git",
+      "using-git-at-sdsc",
+    ]);
+  }
+
+  if (src.endsWith("/basic_skills/basic_linux_skills_expanse/directories-navigation.md")) {
+    text = text.replace(/\]\(#permissions\)/gi, "](./permissions)");
+  }
+
+  return text;
+}
+
+function patchMdx(text, sourcePath = "") {
+  const fileDir = sourcePath ? path.dirname(sourcePath) : process.cwd();
+
   // add title first (uses original H1 before any later normalization)
   text = addFrontmatterTitle(text);
 
-  return text
+  let out = text
     // Anchor at end of a heading line:
-    // "## Title <a name="id">" -> "## Title {#id}"
-    .replace(/^(#{1,6}\s+.*?)\s*<a\s+name="([^"]+)"\s*>\s*$/gm, "$1 {#$2}")
+    // "## Title <a name="id"></a>" -> "## Title {#id}"
+    .replace(/^(#{1,6}\s+.*?)\s*<a\s+name="([^"]+)"\s*>(?:\s*<\/a>)?\s*$/gim, "$1 {#$2}")
+
+    // Anchor at beginning of heading line:
+    // "## <a name="id"></a>Title" -> "## Title {#id}"
+    .replace(/^(#{1,6}\s*)<a\s+name="([^"]+)"\s*>(?:\s*<\/a>)?\s*(.*?)\s*$/gim, "$1$3 {#$2}")
 
     // Legacy anchor-only line:
     // "<a name="top">Contents" -> "## Contents {#top}"
-    .replace(/^<a\s+name="([^"]+)"\s*>\s*([^\n]+)$/gim, "## $2 {#$1}")
+    .replace(/^<a\s+name="([^"]+)"\s*>(?:\s*<\/a>)?\s*([^\n]+)$/gim, "## $2 {#$1}")
 
     // Convert HTML links to Markdown links (works for both closed and broken <a href>)
     // <a href="URL">Text</a>  OR  <a href="URL">Text  ->  [Text](URL)
     .replace(/<a\s+href="([^"]+)"[^>]*>\s*([\s\S]*?)(?:<\/a>|(?=\n|$))/gi, "[$2]($1)")
+    // Fix known bare same-page slug links in source docs.
+    .replace(/\]\(module-commands\)/gi, "](#module-commands)")
 
     // Remove any remaining <a ...> or </a>
     .replace(/<\/?a\b[^>]*>/gi, "")
@@ -206,6 +261,11 @@ function patchMdx(text, fileDir = process.cwd()) {
     .replace(/\[\s*\[\s*Back to[^\n]*$/gim, "")
     .replace(/\[\s*Back to[^\n]*$/gim, "")
 
+    // Normalize malformed encoded/quoted anchors.
+    .replace(/\(#([^)#\s]*?)%22\)/gi, "(#$1)")
+    .replace(/\]\(#([^)\s"]+)"\)/gi, "](#$1)")
+    .replace(/\(#([^)#\s]*?)"\)/gi, "(#$1)")
+
     // Convert placeholder syntax to inline code:
     // "<< module name >>" OR "<module name>" -> `module name`
     // Run this late so most HTML tags have already been converted first.
@@ -224,6 +284,23 @@ function patchMdx(text, fileDir = process.cwd()) {
       return `\`${candidate}\``;
     })
     ;
+
+  // Promote self-closing div ids to heading ids when followed by a heading.
+  // Example:
+  // <div id='quickstart'/>
+  // ## Quick Start
+  // -> ## Quick Start {#quickstart}
+  out = out.replace(
+    /<div\s+id=['"]([^'"]+)['"]\s*\/>\s*(?:\r?\n\s*)+(#{1,6}\s+[^\n]+)/gi,
+    (_, id, heading) => `${heading} {#${id}}`
+  );
+
+  // If any self-closing div id remains, keep it as explicit HTML anchor.
+  out = out.replace(/<div\s+id=['"]([^'"]+)['"]\s*\/>/gi, '<a id="$1"></a>');
+
+  out = fixFileSpecificLinks(out, sourcePath);
+
+  return out;
 }
 
 // Recursively copy + patch *.md/*.mdx only; other files copied as-is
@@ -242,7 +319,7 @@ function walkAndCopy(srcDir, outDir) {
     const ext = path.extname(entry.name).toLowerCase();
     if (ext === ".md" || ext === ".mdx") {
       const raw = fs.readFileSync(srcPath, "utf8");
-      fs.writeFileSync(outPath, patchMdx(raw, path.dirname(srcPath)), "utf8");
+      fs.writeFileSync(outPath, patchMdx(raw, srcPath), "utf8");
     } else {
       fs.copyFileSync(srcPath, outPath);
     }
@@ -276,7 +353,7 @@ for (const entry of fs.readdirSync(SRC, { withFileTypes: true })) {
     const ext = path.extname(entry.name).toLowerCase();
     if (ext === ".md" || ext === ".mdx") {
       const raw = fs.readFileSync(srcPath, "utf8");
-      fs.writeFileSync(outPath, patchMdx(raw, path.dirname(srcPath)), "utf8");
+      fs.writeFileSync(outPath, patchMdx(raw, srcPath), "utf8");
     } else {
       fs.copyFileSync(srcPath, outPath);
     }

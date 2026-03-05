@@ -10,7 +10,11 @@ const config: Config = {
   baseUrl: "/hpc-training-docs/",
 
   onBrokenLinks: "warn",
-  onBrokenMarkdownLinks: "warn",
+  markdown: {
+    hooks: {
+      onBrokenMarkdownLinks: "warn",
+    },
+  },
 
   i18n: {
     defaultLocale: "en",
