@@ -10,7 +10,8 @@
   ],
 
   "branchOverrides": {
-    "basic_skills": "hpc-training-doc"
+    "basic_skills": "hpc-training-doc",
+    "expanse-101": "docusaurus"
   },
 
   "manualRepos": [
@@ -21,4 +22,3 @@
     }
   ]
 }
-
