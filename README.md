@@ -1,27 +1,83 @@
 # HPC Training Docs Website
 
-This website is built using [Docusaurus](https://docusaurus.io/), a modern static website generator.
+This repository hosts the SDSC HPC training docs site built with [Docusaurus](https://docusaurus.io/).
 
-## Installation
+## How It Works
+
+- Documentation source repos are tracked as git submodules under `docs_external/`.
+- Submodules are synced from your GitHub org by topic (`documentation`) using `scripts/sync-doc-submodules.mjs`.
+- External docs are patched/copied into `docs/` by `scripts/patch-external-docs.mjs`.
+- Docusaurus serves/builds from `docs/`.
+
+Key config files:
+
+- `submodules.docs.json` - org/topic/path/branch rules for sync
+- `.gitmodules` - tracked submodule entries
+- `docusaurus.config.ts` - site/nav/theme config
+
+## Prerequisites
+
+- Node.js `>=20`
+- npm
+
+## Install
 
 ```bash
 npm install
 ```
 
-## Local Development
+## Run Locally
 
 ```bash
 npm run start
 ```
 
-This command starts a local development server and opens up a browser window. Most changes are reflected live without having to restart the server.
+`prestart` automatically runs `scripts/patch-external-docs.mjs` first.
 
-## Build
+## Build Locally
 
 ```bash
 npm run build
 ```
 
-This command generates static content into the `build` directory and can be served using any static contents hosting service.
+`prebuild` also runs `scripts/patch-external-docs.mjs` first and outputs static files to `build/`.
 
-nt way to build the website and push to the `gh-pages` branch.
+## Sync Submodules Locally
+
+To test org/topic auto-sync locally:
+
+```bash
+GH_TOKEN=<your_github_token> node scripts/sync-doc-submodules.mjs
+```
+
+Then check what changed:
+
+```bash
+git status
+cat .gitmodules
+ls docs_external
+```
+
+## GitHub Actions (Single Workflow)
+
+Workflow: `.github/workflows/sync-doc-submodules.yml`
+
+Triggers:
+
+- push to `main`
+- daily schedule (`0 9 * * *`)
+- manual dispatch
+
+Pipeline in one workflow:
+
+1. Sync submodules from org topic + manual repos
+2. Commit and push submodule changes (if any)
+3. Build Docusaurus site
+4. Deploy to GitHub Pages
+
+## Notes
+
+- External repo inclusion rules are controlled by `submodules.docs.json`.
+- Repos discovered by org topic are auto-removed when they no longer match the configured topic (`autoRemove: true`).
+- `manualRepos` are always included and never auto-removed.
+- Docs patching is idempotent and reruns on every start/build.
