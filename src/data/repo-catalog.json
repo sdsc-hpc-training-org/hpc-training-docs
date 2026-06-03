@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-03T13:21:33.203Z",
+  "generatedAt": "2026-06-03T21:55:14.627Z",
   "repos": [
     {
       "id": "basic_skills",
@@ -93,22 +93,6 @@
         "summer-institute"
       ],
       "route": "/ciml-summer-institute-2025/",
-      "hasDocs": true
-    },
-    {
-      "id": "ciml-summer-institute-2026",
-      "name": "ciml-summer-institute-2026",
-      "owner": "ciml-org",
-      "fullName": "ciml-org/ciml-summer-institute-2026",
-      "url": "https://github.com/ciml-org/ciml-summer-institute-2026",
-      "branch": "main",
-      "source": "manual",
-      "topics": [
-        "ciml",
-        "documentation",
-        "summer-institute"
-      ],
-      "route": "/ciml-summer-institute-2026/",
       "hasDocs": true
     },
     {
