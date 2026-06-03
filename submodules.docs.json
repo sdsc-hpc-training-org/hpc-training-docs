@@ -115,15 +115,6 @@
         "ciml",
         "summer-institute"
       ]
-    },
-    {
-      "name": "ciml-summer-institute-2026",
-      "url": "https://github.com/ciml-org/ciml-summer-institute-2026.git",
-      "topics": [
-        "documentation",
-        "ciml",
-        "summer-institute"
-      ]
     }
   ]
 }
